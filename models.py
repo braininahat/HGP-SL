@@ -24,8 +24,12 @@ class Model(torch.nn.Module):
         self.conv2 = GCN(self.nhid, self.nhid)
         self.conv3 = GCN(self.nhid, self.nhid)
 
-        self.pool1 = HGPSLPool(self.nhid, self.pooling_ratio, self.sample, self.sparse, self.sl, self.lamb)
-        self.pool2 = HGPSLPool(self.nhid, self.pooling_ratio, self.sample, self.sparse, self.sl, self.lamb)
+        self.pool1 = HGPSLPool(
+            self.nhid, self.pooling_ratio, self.sample, self.sparse, self.sl, self.lamb
+        )
+        self.pool2 = HGPSLPool(
+            self.nhid, self.pooling_ratio, self.sample, self.sparse, self.sl, self.lamb
+        )
 
         self.lin1 = torch.nn.Linear(self.nhid * 2, self.nhid)
         self.lin2 = torch.nn.Linear(self.nhid, self.nhid // 2)

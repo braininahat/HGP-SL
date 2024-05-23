@@ -28,19 +28,25 @@ class TwoHopNeighborhood(object):
             value = value.view(-1, *[1 for _ in range(edge_attr.dim() - 1)])
             value = value.expand(-1, *list(edge_attr.size())[1:])
             edge_attr = torch.cat([edge_attr, value], dim=0)
-            data.edge_index, edge_attr = coalesce(edge_index, edge_attr, n, n, op='min', fill_value=fill)
+            data.edge_index, edge_attr = coalesce(
+                edge_index,
+                edge_attr,
+                n,
+                n,
+                op="min",
+            )
             edge_attr[edge_attr >= fill] = 0
             data.edge_attr = edge_attr
 
         return data
 
     def __repr__(self):
-        return '{}()'.format(self.__class__.__name__)
+        return "{}()".format(self.__class__.__name__)
 
 
 class GCN(MessagePassing):
     def __init__(self, in_channels, out_channels, cached=False, bias=True, **kwargs):
-        super(GCN, self).__init__(aggr='add', **kwargs)
+        super(GCN, self).__init__(aggr="add", **kwargs)
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -55,7 +61,7 @@ class GCN(MessagePassing):
             self.bias = Parameter(torch.Tensor(out_channels))
             nn.init.zeros_(self.bias.data)
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
 
         self.reset_parameters()
 
@@ -66,12 +72,14 @@ class GCN(MessagePassing):
     @staticmethod
     def norm(edge_index, num_nodes, edge_weight, dtype=None):
         if edge_weight is None:
-            edge_weight = torch.ones((edge_index.size(1),), dtype=dtype, device=edge_index.device)
+            edge_weight = torch.ones(
+                (edge_index.size(1),), dtype=dtype, device=edge_index.device
+            )
 
         row, col = edge_index
         deg = scatter_add(edge_weight, row, dim=0, dim_size=num_nodes)
         deg_inv_sqrt = deg.pow(-0.5)
-        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
+        deg_inv_sqrt[deg_inv_sqrt == float("inf")] = 0
 
         return edge_index, deg_inv_sqrt[row] * edge_weight * deg_inv_sqrt[col]
 
@@ -81,7 +89,10 @@ class GCN(MessagePassing):
         if self.cached and self.cached_result is not None:
             if edge_index.size(1) != self.cached_num_edges:
                 raise RuntimeError(
-                    'Cached {} number of edges, but found {}'.format(self.cached_num_edges, edge_index.size(1)))
+                    "Cached {} number of edges, but found {}".format(
+                        self.cached_num_edges, edge_index.size(1)
+                    )
+                )
 
         if not self.cached or self.cached_result is None:
             self.cached_num_edges = edge_index.size(1)
@@ -101,12 +112,14 @@ class GCN(MessagePassing):
         return aggr_out
 
     def __repr__(self):
-        return '{}({}, {})'.format(self.__class__.__name__, self.in_channels, self.out_channels)
+        return "{}({}, {})".format(
+            self.__class__.__name__, self.in_channels, self.out_channels
+        )
 
 
 class NodeInformationScore(MessagePassing):
     def __init__(self, improved=False, cached=False, **kwargs):
-        super(NodeInformationScore, self).__init__(aggr='add', **kwargs)
+        super(NodeInformationScore, self).__init__(aggr="add", **kwargs)
 
         self.improved = improved
         self.cached = cached
@@ -116,26 +129,40 @@ class NodeInformationScore(MessagePassing):
     @staticmethod
     def norm(edge_index, num_nodes, edge_weight, dtype=None):
         if edge_weight is None:
-            edge_weight = torch.ones((edge_index.size(1),), dtype=dtype, device=edge_index.device)
+            edge_weight = torch.ones(
+                (edge_index.size(1),), dtype=dtype, device=edge_index.device
+            )
 
         row, col = edge_index
         deg = scatter_add(edge_weight, row, dim=0, dim_size=num_nodes)
         deg_inv_sqrt = deg.pow(-0.5)
-        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
+        deg_inv_sqrt[deg_inv_sqrt == float("inf")] = 0
 
-        edge_index, edge_weight = add_remaining_self_loops(edge_index, edge_weight, 0, num_nodes)
+        edge_index, edge_weight = add_remaining_self_loops(
+            edge_index, edge_weight, 0, num_nodes
+        )
 
         row, col = edge_index
-        expand_deg = torch.zeros((edge_weight.size(0),), dtype=dtype, device=edge_index.device)
-        expand_deg[-num_nodes:] = torch.ones((num_nodes,), dtype=dtype, device=edge_index.device)
+        expand_deg = torch.zeros(
+            (edge_weight.size(0),), dtype=dtype, device=edge_index.device
+        )
+        expand_deg[-num_nodes:] = torch.ones(
+            (num_nodes,), dtype=dtype, device=edge_index.device
+        )
 
-        return edge_index, expand_deg - deg_inv_sqrt[row] * edge_weight * deg_inv_sqrt[col]
+        return (
+            edge_index,
+            expand_deg - deg_inv_sqrt[row] * edge_weight * deg_inv_sqrt[col],
+        )
 
     def forward(self, x, edge_index, edge_weight):
         if self.cached and self.cached_result is not None:
             if edge_index.size(1) != self.cached_num_edges:
                 raise RuntimeError(
-                    'Cached {} number of edges, but found {}'.format(self.cached_num_edges, edge_index.size(1)))
+                    "Cached {} number of edges, but found {}".format(
+                        self.cached_num_edges, edge_index.size(1)
+                    )
+                )
 
         if not self.cached or self.cached_result is None:
             self.cached_num_edges = edge_index.size(1)
@@ -154,7 +181,16 @@ class NodeInformationScore(MessagePassing):
 
 
 class HGPSLPool(torch.nn.Module):
-    def __init__(self, in_channels, ratio=0.8, sample=False, sparse=False, sl=True, lamb=1.0, negative_slop=0.2):
+    def __init__(
+        self,
+        in_channels,
+        ratio=0.8,
+        sample=False,
+        sparse=False,
+        sl=True,
+        lamb=1.0,
+        negative_slop=0.2,
+    ):
         super(HGPSLPool, self).__init__()
         self.in_channels = in_channels
         self.ratio = ratio
@@ -182,7 +218,9 @@ class HGPSLPool(torch.nn.Module):
         perm = topk(score, self.ratio, batch)
         x = x[perm]
         batch = batch[perm]
-        induced_edge_index, induced_edge_attr = filter_adj(edge_index, edge_attr, perm, num_nodes=score.size(0))
+        induced_edge_index, induced_edge_attr = filter_adj(
+            edge_index, edge_attr, perm, num_nodes=score.size(0)
+        )
 
         # Discard structure learning layer, directly return
         if self.sl is False:
@@ -196,20 +234,30 @@ class HGPSLPool(torch.nn.Module):
             # edge weights between them.
             k_hop = 3
             if edge_attr is None:
-                edge_attr = torch.ones((edge_index.size(1),), dtype=torch.float, device=edge_index.device)
+                edge_attr = torch.ones(
+                    (edge_index.size(1),), dtype=torch.float, device=edge_index.device
+                )
 
             hop_data = Data(x=original_x, edge_index=edge_index, edge_attr=edge_attr)
             for _ in range(k_hop - 1):
                 hop_data = self.neighbor_augment(hop_data)
             hop_edge_index = hop_data.edge_index
             hop_edge_attr = hop_data.edge_attr
-            new_edge_index, new_edge_attr = filter_adj(hop_edge_index, hop_edge_attr, perm, num_nodes=score.size(0))
+            new_edge_index, new_edge_attr = filter_adj(
+                hop_edge_index, hop_edge_attr, perm, num_nodes=score.size(0)
+            )
 
-            new_edge_index, new_edge_attr = add_remaining_self_loops(new_edge_index, new_edge_attr, 0, x.size(0))
+            new_edge_index, new_edge_attr = add_remaining_self_loops(
+                new_edge_index, new_edge_attr, 0, x.size(0)
+            )
             row, col = new_edge_index
             weights = (torch.cat([x[row], x[col]], dim=1) * self.att).sum(dim=-1)
-            weights = F.leaky_relu(weights, self.negative_slop) + new_edge_attr * self.lamb
-            adj = torch.zeros((x.size(0), x.size(0)), dtype=torch.float, device=x.device)
+            weights = (
+                F.leaky_relu(weights, self.negative_slop) + new_edge_attr * self.lamb
+            )
+            adj = torch.zeros(
+                (x.size(0), x.size(0)), dtype=torch.float, device=x.device
+            )
             adj[row, col] = weights
             new_edge_index, weights = dense_to_sparse(adj)
             row, col = new_edge_index
@@ -226,12 +274,19 @@ class HGPSLPool(torch.nn.Module):
         else:
             # Learning the possible edge weights between each pair of nodes in the pooled subgraph, relative slower.
             if edge_attr is None:
-                induced_edge_attr = torch.ones((induced_edge_index.size(1),), dtype=x.dtype,
-                                               device=induced_edge_index.device)
+                induced_edge_attr = torch.ones(
+                    (induced_edge_index.size(1),),
+                    dtype=x.dtype,
+                    device=induced_edge_index.device,
+                )
             num_nodes = scatter_add(batch.new_ones(x.size(0)), batch, dim=0)
-            shift_cum_num_nodes = torch.cat([num_nodes.new_zeros(1), num_nodes.cumsum(dim=0)[:-1]], dim=0)
+            shift_cum_num_nodes = torch.cat(
+                [num_nodes.new_zeros(1), num_nodes.cumsum(dim=0)[:-1]], dim=0
+            )
             cum_num_nodes = num_nodes.cumsum(dim=0)
-            adj = torch.zeros((x.size(0), x.size(0)), dtype=torch.float, device=x.device)
+            adj = torch.zeros(
+                (x.size(0), x.size(0)), dtype=torch.float, device=x.device
+            )
             # Construct batch fully connected graph in block diagonal matirx format
             for idx_i, idx_j in zip(shift_cum_num_nodes, cum_num_nodes):
                 adj[idx_i:idx_j, idx_i:idx_j] = 1.0
