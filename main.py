@@ -11,8 +11,6 @@ from torch_geometric.datasets import TUDataset
 
 from models import Model
 
-# from data import LocalTUDataset
-
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--seed", type=int, default=777, help="random seed")
@@ -53,7 +51,10 @@ if torch.cuda.is_available():
     torch.cuda.manual_seed(args.seed)
 
 dataset = TUDataset(
-    os.path.join("data", args.dataset), name=args.dataset, use_node_attr=True
+    os.path.join("data", args.dataset),
+    name=args.dataset,
+    use_edge_attr=True,
+    use_node_attr=True,
 )
 
 args.num_classes = dataset.num_classes
@@ -72,138 +73,14 @@ train_loader = DataLoader(training_set, batch_size=args.batch_size, shuffle=True
 val_loader = DataLoader(validation_set, batch_size=args.batch_size, shuffle=False)
 test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
 
-
 model = Model(args).to(args.device)
 optimizer = torch.optim.Adam(
     model.parameters(), lr=args.lr, weight_decay=args.weight_decay
 )
 
-# def train():
-#     min_loss = 1e10
-#     patience_cnt = 0
-#     val_loss_values = []
-#     best_epoch = 0
-
-#     t = time.time()
-#     model.train()
-#     for epoch in range(args.epochs):
-#         loss_train = 0.0
-#         correct = 0
-#         total_samples = 0
-#         true_positives = 0
-#         true_negatives = 0
-#         false_positives = 0
-#         false_negatives = 0
-
-#         for i, data in enumerate(train_loader):
-#             optimizer.zero_grad()
-#             data = data.to(args.device)
-#             out = model(data)
-#             loss = F.nll_loss(out, data.y)
-#             loss.backward()
-#             optimizer.step()
-#             loss_train += loss.item()
-#             pred = out.max(dim=1)[1]
-#             correct += pred.eq(data.y).sum().item()
-
-#             # Calculate additional metrics
-#             total_samples += data.y.size(0)
-#             true_positives += ((pred == 1) & (data.y == 1)).sum().item()
-#             true_negatives += ((pred == 0) & (data.y == 0)).sum().item()
-#             false_positives += ((pred == 1) & (data.y == 0)).sum().item()
-#             false_negatives += ((pred == 0) & (data.y == 1)).sum().item()
-
-#             # Calculate additional metrics
-#             precision_train = true_positives / (true_positives + false_positives)
-#             recall_train = true_positives / (true_positives + false_negatives)
-#             f1_train = 2 * (precision_train * recall_train) / (precision_train + recall_train)
-#             acc_train = (true_positives + true_negatives) / total_samples
-
-#         acc_train = correct / total_samples
-#         acc_val, loss_val, precision_val, recall_val, f1_val = compute_test(val_loader)
-#         print(
-#             "Epoch: {:04d}".format(epoch + 1),
-#             "loss_train: {:.4f}".format(loss_train),
-#             "acc_train: {:.4f}".format(acc_train),
-#             "precision_train: {:.4f}".format(precision_train),
-#             "recall_train: {:.4f}".format(recall_train),
-#             "f1_train: {:.4f}".format(f1_train),
-#             "loss_val: {:.4f}".format(loss_val),
-#             "acc_val: {:.4f}".format(acc_val),
-#             "precision_val: {:.4f}".format(precision_val),
-#             "recall_val: {:.4f}".format(recall_val),
-#             "f1_val: {:.4f}".format(f1_val),
-#             "time: {:.4f}s".format(time.time() - t),
-#         )
-
-#         val_loss_values.append(loss_val)
-#         torch.save(model.state_dict(), "{}.pth".format(epoch))
-#         if val_loss_values[-1] < min_loss:
-#             min_loss = val_loss_values[-1]
-#             best_epoch = epoch
-#             patience_cnt = 0
-#         else:
-#             patience_cnt += 1
-
-#         if patience_cnt == args.patience:
-#             break
-
-#         files = glob.glob("*.pth")
-#         for f in files:
-#             epoch_nb = int(f.split(".")[0])
-#             if epoch_nb < best_epoch:
-#                 os.remove(f)
-
-#     files = glob.glob("*.pth")
-#     for f in files:
-#         epoch_nb = int(f.split(".")[0])
-#         if epoch_nb > best_epoch:
-#             os.remove(f)
-#     print("Optimization Finished! Total time elapsed: {:.6f}".format(time.time() - t))
-
-#     return best_epoch
-
-
-# def compute_test(loader):
-#     """
-#     Computes the test metrics for a given data loader.
-
-#     Args:
-#         loader (torch.utils.data.DataLoader): The data loader containing the test data.
-
-#     Returns:
-#         tuple: A tuple containing the following metrics:
-#             - accuracy (float): The accuracy of the model on the test data.
-#             - loss_test (float): The loss value on the test data.
-#             - precision (float): The precision metric.
-#             - recall (float): The recall metric.
-#             - f1_score (float): The F1 score metric.
-#     """
-#     model.eval()
-#     correct = 0.0
-#     loss_test = 0.0
-#     total_samples = 0
-#     true_positives = 0
-#     true_negatives = 0
-#     false_positives = 0
-#     false_negatives = 0
-#     for data in loader:
-#         data = data.to(args.device)
-#         out = model(data)
-#         pred = out.max(dim=1)[1]
-#         correct += pred.eq(data.y).sum().item()
-#         loss_test += F.nll_loss(out, data.y).item()
-#         # Calculate additional metrics
-#         total_samples += data.y.size(0)
-#         true_positives += ((pred == 1) & (data.y == 1)).sum().item()
-#         true_negatives += ((pred == 0) & (data.y == 0)).sum().item()
-#         false_positives += ((pred == 1) & (data.y == 0)).sum().item()
-#         false_negatives += ((pred == 0) & (data.y == 1)).sum().item()
-#     accuracy = (true_positives + true_negatives) / total_samples
-#     precision = true_positives / (true_positives + false_positives)
-#     recall = true_positives / (true_positives + false_negatives)
-#     f1_score = 2 * (precision * recall) / (precision + recall)
-#     return accuracy, loss_test, precision, recall, f1_score
+# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+#     optimizer, mode="min", factor=0.95, patience=20, verbose=True
+# )
 
 
 def train():
@@ -237,6 +114,8 @@ def train():
             "acc_val: {:.6f}".format(acc_val),
             "time: {:.6f}s".format(time.time() - t),
         )
+
+        # scheduler.step(loss_val)
 
         val_loss_values.append(loss_val)
         torch.save(model.state_dict(), "{}.pth".format(epoch))
